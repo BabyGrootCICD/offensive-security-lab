@@ -1,0 +1,16 @@
+[package]
+name = "ssrf_scan"
+version = "0.1.0"
+edition = "2021"
+description = "靜態檢查 Rust 原始碼裡可能的 SSRF。只讀檔案，不會對任何網址送出請求。"
+publish = false
+
+[[bin]]
+name = "ssrfscan"
+path = "src/main.rs"
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "visit"] }

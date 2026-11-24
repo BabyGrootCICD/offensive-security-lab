@@ -1,0 +1,26 @@
+{
+  "name": "ssrf-scan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "靜態檢查 JavaScript 與 TypeScript 裡可能的 SSRF。只讀原始碼，不會對任何網址送出請求。",
+  "type": "module",
+  "bin": {
+    "ssrf-scan": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/scan.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test test/scan.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
+}

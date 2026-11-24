@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/ssrf-report.schema.json",
+  "title": "SSRF static review report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "scanner", "findings"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "scanner": { "type": "string", "enum": ["go", "js", "rust", "merged"] },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ruleId",
+        "severity",
+        "title",
+        "file",
+        "line",
+        "source",
+        "sink",
+        "impact",
+        "remediation",
+        "snippet"
+      ],
+      "properties": {
+        "ruleId": { "type": "string", "pattern": "^SSRF-00[1-5]$" },
+        "severity": { "type": "string", "enum": ["high", "medium"] },
+        "title": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "source": { "type": "string" },
+        "sink": { "type": "string" },
+        "impact": { "type": "string" },
+        "remediation": { "type": "string" },
+        "snippet": { "type": "string" }
+      }
+    }
+  }
+}

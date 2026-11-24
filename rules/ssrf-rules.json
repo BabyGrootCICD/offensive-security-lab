@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "SSRF-001",
+      "severity": "high",
+      "title": "可能的 SSRF：不可信輸入到達 HTTP client",
+      "impact": "伺服器可能被帶去請求非預期目的地，包含內網服務。",
+      "remediation": "使用者只傳 productId 或 storeId，由程式決定固定上游。若業務一定要收 URL，請嚴格解析、限制 scheme、對 host 做精確相等比對、檢查每個解析後的 IP，並對重新導向與重試套用同一政策。同時限制 egress，管理功能使用獨立認證。",
+      "sinks": {
+        "go": [
+          "net/http.Get",
+          "net/http.Post",
+          "net/http.Head",
+          "net/http.NewRequest",
+          "net/http.NewRequestWithContext",
+          "(*net/http.Client).Get",
+          "(*net/http.Client).Post",
+          "(*net/http.Client).Head",
+          "(*net/http.Client).Do"
+        ],
+        "js": [
+          "fetch",
+          "axios.get",
+          "axios.post",
+          "axios.put",
+          "axios.delete",
+          "axios.request",
+          "axios",
+          "got",
+          "http.get",
+          "https.get",
+          "http.request",
+          "https.request"
+        ],
+        "rust": [
+          "reqwest::get",
+          "reqwest::blocking::get",
+          "ureq::get",
+          "hyper::Request::get"
+        ]
+      }
+    },
+    {
+      "id": "SSRF-002",
+      "severity": "medium",
+      "title": "可能的 SSRF：只以字面主機名稱做封鎖",
+      "impact": "字面比對和實際解析出的目的地可能不一致，伺服器仍可能被帶去請求非預期目的地。",
+      "remediation": "改為解析後的精確 host allowlist，並檢查每個解析後的 IP。不要只封鎖少數字面主機名稱。"
+    },
+    {
+      "id": "SSRF-003",
+      "severity": "medium",
+      "title": "可能的 SSRF：以子字串比對 allowlist",
+      "impact": "子字串或前後綴比對可能把不受信任的主機名稱誤認成被允許的主機。",
+      "remediation": "解析 URL 後，以 host 精確相等比對允許的主機，不要用子字串、前綴或後綴判斷。"
+    },
+    {
+      "id": "SSRF-004",
+      "severity": "medium",
+      "title": "可能的 SSRF：重新導向未再檢查目的地",
+      "impact": "第一次目的地通過檢查後，後續重新導向仍可能把請求帶到非預期的位址。",
+      "remediation": "關閉自動跟隨重新導向，或在每一次跳轉時用同一套 scheme、host 與解析後 IP 政策重新檢查。"
+    },
+    {
+      "id": "SSRF-005",
+      "severity": "medium",
+      "title": "管理功能僅因 loopback 來源放行",
+      "impact": "只要請求看起來來自本機，就可能執行管理操作。網路位置不能代替授權。",
+      "remediation": "管理功能需要獨立的身分驗證與授權，不要因為連線來自 loopback 就放行。"
+    }
+  ]
+}

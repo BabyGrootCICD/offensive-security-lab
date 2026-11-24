@@ -1,0 +1,117 @@
+name: SSRF static review
+description: 掃描原始碼裡可能的 SSRF，產出修復建議。只讀檔案，不會對任何網址送出請求。
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: 要掃描的路徑
+    required: false
+    default: "."
+  fail_on:
+    description: high、medium 或 none。high 在有高風險時失敗；medium 在中或高風險時失敗。
+    required: false
+    default: high
+
+outputs:
+  report_json:
+    description: JSON 報告路徑
+    value: ${{ steps.merge.outputs.report_json }}
+  report_markdown:
+    description: Markdown 報告路徑
+    value: ${{ steps.merge.outputs.report_markdown }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        SCAN_PATH: ${{ inputs.path }}
+      run: python3 "$GITHUB_ACTION_PATH/scripts/detect_languages.py" --path "$SCAN_PATH" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Go
+      if: steps.detect.outputs.go == 'true'
+      uses: actions/setup-go@v5
+      with:
+        go-version: "1.22"
+
+    - name: Scan Go
+      if: steps.detect.outputs.go == 'true'
+      shell: bash
+      env:
+        SCAN_PATH: ${{ inputs.path }}
+      run: |
+        scan_path="$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$SCAN_PATH")"
+        cd "$GITHUB_ACTION_PATH/packages/go"
+        go run ./cmd/ssrfscan \
+          --path "$scan_path" \
+          --rules "$GITHUB_ACTION_PATH/rules/ssrf-rules.json" \
+          --json-out "$RUNNER_TEMP/ssrf-go.json"
+
+    - name: Set up Node
+      if: steps.detect.outputs.js == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Scan JavaScript
+      if: steps.detect.outputs.js == 'true'
+      shell: bash
+      env:
+        SCAN_PATH: ${{ inputs.path }}
+      run: |
+        scan_path="$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$SCAN_PATH")"
+        cd "$GITHUB_ACTION_PATH/packages/js"
+        npm ci
+        npm run build
+        node dist/cli.js \
+          --path "$scan_path" \
+          --rules "$GITHUB_ACTION_PATH/rules/ssrf-rules.json" \
+          --json-out "$RUNNER_TEMP/ssrf-js.json"
+
+    - name: Set up Rust
+      if: steps.detect.outputs.rust == 'true'
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Scan Rust
+      if: steps.detect.outputs.rust == 'true'
+      shell: bash
+      env:
+        SCAN_PATH: ${{ inputs.path }}
+      run: |
+        scan_path="$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$SCAN_PATH")"
+        cargo run --quiet --manifest-path "$GITHUB_ACTION_PATH/packages/rust/Cargo.toml" -- \
+          --path "$scan_path" \
+          --rules "$GITHUB_ACTION_PATH/rules/ssrf-rules.json" \
+          --json-out "$RUNNER_TEMP/ssrf-rust.json"
+
+    - id: merge
+      shell: bash
+      env:
+        FAIL_ON: ${{ inputs.fail_on }}
+      run: |
+        set +e
+        python3 "$GITHUB_ACTION_PATH/scripts/merge_report.py" \
+          --json "$RUNNER_TEMP/ssrf-go.json" \
+          --json "$RUNNER_TEMP/ssrf-js.json" \
+          --json "$RUNNER_TEMP/ssrf-rust.json" \
+          --json-out "$GITHUB_WORKSPACE/ssrf-report.json" \
+          --md-out "$GITHUB_WORKSPACE/ssrf-report.md" \
+          --fail-on "$FAIL_ON"
+        status=$?
+        set -e
+        echo "report_json=$GITHUB_WORKSPACE/ssrf-report.json" >> "$GITHUB_OUTPUT"
+        echo "report_markdown=$GITHUB_WORKSPACE/ssrf-report.md" >> "$GITHUB_OUTPUT"
+        exit "$status"
+
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ssrf-report
+        if-no-files-found: warn
+        path: |
+          ssrf-report.json
+          ssrf-report.md

@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Go tests
+        working-directory: packages/go
+        run: go test ./...
+      - name: JavaScript tests
+        working-directory: packages/js
+        run: npm ci && npm test
+      - name: Rust tests
+        working-directory: packages/rust
+        run: cargo test
+      - name: Merge an empty report
+        run: |
+          python3 scripts/merge_report.py \
+            --json "$RUNNER_TEMP/missing.json" \
+            --json-out "$RUNNER_TEMP/ssrf-report.json" \
+            --md-out "$RUNNER_TEMP/ssrf-report.md" \
+            --fail-on none
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          text = Path(os.environ["RUNNER_TEMP"], "ssrf-report.md").read_text(encoding="utf-8")
+          if "需要人工確認" not in text or "沒有對任何網址送出請求" not in text:
+              raise SystemExit("markdown report is missing the static-review statement")
+          PY
